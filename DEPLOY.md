@@ -28,6 +28,9 @@ Use these settings:
 | **Production branch** | `main` |
 | **Build command** | `npm run build` |
 | **Build output directory** | `.svelte-kit/cloudflare` |
+| **Deploy command** | `npm run deploy` |
+
+If your project has a **Deploy command** field, set it to `npm run deploy`. (If it’s set to `npx wrangler deploy`, the deploy step will fail; Pages needs `wrangler pages deploy`.)
 
 Optionally set **Project name** (e.g. `corpspeak`); this becomes your `*.pages.dev` subdomain.
 
