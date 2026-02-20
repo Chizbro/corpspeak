@@ -1,0 +1,1 @@
+This is CorpSpeak (short for Corporate Speak). It is a multi-user chatroom where every user's message is first fed through an LLM that translates it into mindless corporate jargon before posting to the room
