@@ -1,87 +1,87 @@
 # Deploying to Cloudflare Pages
 
-## 1. Push your code to GitHub
+This guide uses the **Wrangler CLI** to deploy. You build locally, deploy with `wrangler pages deploy`, then set your Convex URL on the resulting Pages project in the dashboard.
 
-If you haven’t already:
+## 1. One-time: Cloudflare API token and account ID
 
-```bash
-git add .
-git commit -m "Add Cloudflare adapter for deployment"
-git push origin main
-```
+Wrangler needs these to deploy. Set them in your environment (e.g. in `.env.local` for local use, or in your CI env).
 
-## 2. Create the project in Cloudflare
+1. **Account ID**  
+   Find it in the dashboard when you’re in Workers & Pages: the URL is `dash.cloudflare.com/<ACCOUNT_ID>/pages/...`. Or use any domain’s **Overview** → **API** section (right-hand side).
 
-1. Open **[Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)** in the Cloudflare dashboard.
-2. Click **Create** → **Pages** → **Connect to Git**.
-3. Choose your Git provider (e.g. GitHub) and authorize Cloudflare.
-4. Select the **corpspeak** repository (or the repo you’re using).
-5. Click **Begin setup**.
-
-## 3. Configure the build
-
-Use these settings:
-
-| Setting | Value |
-|--------|--------|
-| **Framework preset** | SvelteKit |
-| **Production branch** | `main` |
-| **Build command** | `npm run build` |
-| **Build output directory** | `.svelte-kit/cloudflare` |
-| **Deploy command** | `npm run deploy` |
-
-Optionally set **Project name** (e.g. `corpspeak`); this becomes your `*.pages.dev` subdomain.
-
-## 4. Add environment variables
-
-### Required for the deploy step (Wrangler auth)
-
-The deploy command runs `wrangler pages deploy`, which needs **both** of these environment variables:
-
-1. **`CLOUDFLARE_ACCOUNT_ID`** (required in CI)  
-   Your account ID. Find it: **Workers & Pages** → any project → the URL is `dash.cloudflare.com/<ACCOUNT_ID>/pages/...`, or from the right-hand **API** section on a domain’s overview.
-
-2. **`CLOUDFLARE_API_TOKEN`**  
-   A token with **Account → Cloudflare Pages: Edit** (Pages Write).
-
-   - Create it from the **Account** API Tokens page (so it’s scoped to the right account):  
-     **[Account → API Tokens](https://dash.cloudflare.com/?to=/:account/api-tokens)**  
-     (Open from the account that owns the Pages project; use the account switcher if you have several.)
-   - **Create Token** → **Edit Cloudflare Workers** template, or **Custom token** with **Account** → **Cloudflare Pages: Edit**.
+2. **API token**  
+   - Go to **[Account → API Tokens](https://dash.cloudflare.com/?to=/:account/api-tokens)** (for the account that will own the Pages project).
+   - **Create Token** → use **Edit Cloudflare Workers** or a **Custom token** with **Account** → **Cloudflare Pages: Edit**.
    - Copy the token once (it’s only shown once).
 
-3. In your Pages project: **Settings** → **Environment variables** (under Builds & deployments).  
-   Add for **Production** and **Preview**:
-   - **`CLOUDFLARE_ACCOUNT_ID`** = your account ID (plain text is fine).
-   - **`CLOUDFLARE_API_TOKEN`** = the token (mark as **Encrypted** / secret).
+Export them (or add to `.env.local` and load with `dotenv` / your shell):
 
-**If you still get “Authentication error [code: 10000]”:**
+```bash
+export CLOUDFLARE_ACCOUNT_ID="your_account_id"
+export CLOUDFLARE_API_TOKEN="your_token"
+```
 
-- Create the token from **Account** API Tokens (not Profile → API Tokens), so it’s an account-scoped token.
-- Ensure your user has a role that can manage Workers/Pages (e.g. **Cloudflare Workers Admin** or **Administrator**) on that account. Check: **Account** → **Members** → your user → **Role**.
-- Create a **new** token (with Pages: Edit) and replace `CLOUDFLARE_API_TOKEN`; old tokens sometimes don’t get the right scope.
+## 2. Build and deploy with Wrangler
 
-### Required for Convex (your app)
+From the project root:
 
-- **Variable name:** `PUBLIC_CONVEX_URL`
-- **Value:** your Convex deployment URL (from the [Convex dashboard](https://dashboard.convex.dev) or from running `npx convex dev` — it looks like `https://your-deployment.convex.cloud`).
+```bash
+npm run build
+npm run deploy
+```
 
-Add it for **Production** (and **Preview** if you want Convex in preview deployments).
+Or in one step:
 
-## 5. Deploy
+```bash
+npm run build && npm run deploy
+```
 
-Click **Save and Deploy**. The first build will run; when it finishes, your site will be live at `https://<project-name>.pages.dev`.
+- If Wrangler says the project doesn’t exist and asks to create it, answer **Yes**. That creates the Pages project (e.g. `corpspeak`) and deploys.
+- The site will be at `https://<project-name>.pages.dev` (e.g. `https://corpspeak.pages.dev`).
 
-## 6. Later deploys
+## 3. Set `PUBLIC_CONVEX_URL` on the Pages project
 
-Every push to `main` triggers a new production deploy. Pull requests get preview URLs.
+The app needs your Convex deployment URL at runtime. Set it on the **Pages project** (not in Wrangler):
 
----
+1. Open **[Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)** in the Cloudflare dashboard.
+2. Open your **Pages** project (the name you gave when deploying, e.g. **corpspeak**).
+3. Go to **Settings** → **Environment variables** (under **Builds & deployments**).
+4. Add a variable:
+   - **Variable name:** `PUBLIC_CONVEX_URL`
+   - **Value:** your Convex deployment URL (e.g. `https://your-deployment.convex.cloud`).  
+     Get it from the [Convex dashboard](https://dashboard.convex.dev) or from `npx convex dev`.
+5. Apply to **Production** (and **Preview** if you use preview deployments).
+6. Save. New requests will use the variable; you don’t need to redeploy for env changes on Pages.
 
-**Convex:** Backend is already on Convex. Deploy it with:
+Your Convex backend stays on Convex; deploy it with:
 
 ```bash
 npx convex deploy
 ```
 
-Use the same Convex deployment URL in `PUBLIC_CONVEX_URL` on Cloudflare so the hosted app talks to your Convex backend.
+Use the same URL in `PUBLIC_CONVEX_URL` so the hosted app talks to that backend.
+
+## 4. Later deploys
+
+To update the site:
+
+```bash
+npm run build && npm run deploy
+```
+
+Redeploy whenever you change app code. Change `PUBLIC_CONVEX_URL` only in the dashboard when you switch Convex deployments.
+
+---
+
+## Optional: Deploy from Git (CI)
+
+If you later want builds and deploys from Git (e.g. on push):
+
+1. In **Workers & Pages**, create a **Pages** project and **Connect to Git**.
+2. Set **Build command** to `npm run build`, **Build output directory** to `.svelte-kit/cloudflare`, and **Deploy command** to `npm run deploy`.
+3. In that project’s **Settings** → **Environment variables**, add:
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `CLOUDFLARE_API_TOKEN` (Encrypted)
+   - `PUBLIC_CONVEX_URL` (your Convex URL)
+
+Then set `PUBLIC_CONVEX_URL` the same way as in step 3 above.
