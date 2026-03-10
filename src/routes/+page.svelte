@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { useQuery, useConvexClient } from 'convex-svelte';
-  import { api } from '$convex/_generated/api';
-  const client = useConvexClient();
+  import { onMount } from 'svelte';
 
-  const roomsResult = useQuery(api.rooms.listRooms, () => ({}));
+  type Message = {
+    id: string;
+    author_name: string;
+    body: string;
+    created_at: string;
+  };
 
   const CLIENT_ID_KEY = 'corpspeak_clientId';
   function getClientId(): string {
@@ -16,6 +19,7 @@
     return id;
   }
 
+  let messages = $state<Message[]>([]);
   let displayName = $state(
     typeof window !== 'undefined' ? localStorage.getItem('corpspeak_displayName') ?? '' : ''
   );
@@ -28,33 +32,51 @@
     if (displayName) localStorage.setItem('corpspeak_displayName', displayName);
   });
 
-  const rooms = $derived(roomsResult.data ?? []);
-  const currentRoom = $derived(rooms[0] ?? null);
+  onMount(() => {
+    const protocol = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = typeof location !== 'undefined' ? location.host : '';
+    const ws = new WebSocket(`${protocol}//${host}/ws`);
 
-  const messagesResult = useQuery(
-    api.messages.listMessages,
-    () => (currentRoom ? { roomId: currentRoom._id } : 'skip')
-  );
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as Message;
+        if (payload?.id && !messages.find((m) => m.id === payload.id)) {
+          messages = [...messages, payload];
+        }
+      } catch {
+        // ignore
+      }
+    };
 
-  const messages = $derived(messagesResult.data ?? []);
-
-  async function createDefaultRoom() {
-    await client.mutation(api.rooms.createRoom, { name: 'General' });
-  }
+    return () => {
+      ws.close();
+    };
+  });
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     const rawBody = messageInput.trim();
-    if (!rawBody || !currentRoom || !displayName.trim()) return;
+    if (!rawBody || !displayName.trim()) return;
     submitError = null;
     isTranslating = true;
     try {
-      await client.action(api.actions.translateAndSend, {
-        roomId: currentRoom._id,
-        rawBody,
-        authorName: displayName.trim(),
-        clientId: getClientId()
+      const res = await fetch('/api/translate-and-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawBody,
+          authorName: displayName.trim(),
+          clientId: getClientId()
+        })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Request failed: ${res.status}`);
+      }
+      const data = await res.json().catch(() => null) as Message | null;
+      if (data?.id && !messages.find((m) => m.id === data!.id)) {
+        messages = [...messages, data];
+      }
       messageInput = '';
     } catch (err) {
       submitError = err instanceof Error ? err.message : String(err);
@@ -65,70 +87,58 @@
 </script>
 
 <div class="chat-view">
-  {#if roomsResult.isLoading}
-    <p class="muted">Loading rooms…</p>
-  {:else if rooms.length === 0}
-    <p class="muted">No room yet.</p>
-    <button type="button" onclick={createDefaultRoom}>Create General room</button>
-  {:else}
-    <div class="room-header">
-      <h2>{currentRoom?.name ?? 'Chat'}</h2>
-    </div>
+  <div class="room-header">
+    <h2>General</h2>
+  </div>
 
-    <div class="identity">
-      <label for="display-name">Display name</label>
-      <input
-        id="display-name"
-        type="text"
-        placeholder="Your name"
-        bind:value={displayName}
-        maxlength={64}
-      />
-    </div>
+  <div class="identity">
+    <label for="display-name">Display name</label>
+    <input
+      id="display-name"
+      type="text"
+      placeholder="Your name"
+      bind:value={displayName}
+      maxlength={64}
+    />
+  </div>
 
-    <div class="messages-wrap">
-      {#if messagesResult.isLoading}
-        <p class="muted">Loading messages…</p>
-      {:else if messagesResult.error}
-        <p class="error">Failed to load: {messagesResult.error.toString()}</p>
-      {:else}
-        <ul class="message-list">
-          {#each messages as msg}
-            <li class="message">
-              <span class="message-author">{msg.authorName}</span>
-              <span class="message-time" title={new Date(msg.createdAt).toISOString()}>
-                {new Date(msg.createdAt).toLocaleTimeString(undefined, {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </span>
-              <p class="message-body">{msg.body}</p>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
+  <div class="messages-wrap">
+    <p class="muted">Messages appear here as they're sent (since you joined). No history is stored.</p>
+    <ul class="message-list">
+      {#each messages as msg}
+        <li class="message">
+          <span class="message-author">{msg.author_name}</span>
+          <span class="message-time" title={new Date(msg.created_at).toISOString()}>
+            {new Date(msg.created_at).toLocaleTimeString(undefined, {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </span>
+          <p class="message-body">{msg.body}</p>
+        </li>
+      {/each}
+    </ul>
+  </div>
 
-    {#if submitError}
-      <p class="error" role="alert">{submitError}</p>
-    {/if}
-    <form class="send-form" onsubmit={handleSubmit}>
-      <input
-        type="text"
-        placeholder="Type a message…"
-        bind:value={messageInput}
-        disabled={!displayName.trim() || isTranslating}
-        aria-label="Message"
-      />
-      <button
-        type="submit"
-        disabled={!messageInput.trim() || !displayName.trim() || isTranslating}
-        aria-busy={isTranslating}
-      >
-        {isTranslating ? 'Translating…' : 'Send'}
-      </button>
-    </form>
+  {#if submitError}
+    <p class="error" role="alert">{submitError}</p>
   {/if}
+  <form class="send-form" onsubmit={handleSubmit}>
+    <input
+      type="text"
+      placeholder="Type a message…"
+      bind:value={messageInput}
+      disabled={!displayName.trim() || isTranslating}
+      aria-label="Message"
+    />
+    <button
+      type="submit"
+      disabled={!messageInput.trim() || !displayName.trim() || isTranslating}
+      aria-busy={isTranslating}
+    >
+      {isTranslating ? 'Translating…' : 'Send'}
+    </button>
+  </form>
 </div>
 
 <style>
@@ -142,6 +152,7 @@
   .muted {
     color: var(--muted);
     margin: 0.5rem 0;
+    font-size: 0.875rem;
   }
 
   .error {

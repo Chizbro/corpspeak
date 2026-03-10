@@ -1,8 +1,7 @@
 # UI: SvelteKit and Svelte 5
-# BACKEND: convex.dev
-# AGENT: Google Gemini 2.0 Flash via Convex action (translateAndSend in convex/actions.ts). API key in Convex env: set GEMINI_API_KEY with `npx convex env set GEMINI_API_KEY <your-key>` (get a key at https://aistudio.google.com/apikey)
-
-
+# HOST: Node (adapter-node); deploy on Render (or any Node host)
+# REAL-TIME: In-process WebSocket on /ws (server.js + src/lib/ws-clients.js); no Pusher/Ably
+# AGENT: Google Gemini 2.0 Flash via SvelteKit API route (src/routes/api/translate-and-send/+server.ts). Set GEMINI_API_KEY (get a key at https://aistudio.google.com/apikey)
 
 DO NOT USE SVELTE 4
 YOU MUST USE RUNES SYNTAX

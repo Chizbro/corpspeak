@@ -1,0 +1,11 @@
+# Render Blueprint: one Web Service for CorpSpeak
+# Connect repo and use "New Blueprint" or set build/start manually per DEPLOY.md
+services:
+  - type: web
+    name: corpspeak
+    runtime: node
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false  # set in Render dashboard
