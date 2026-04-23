@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createClient } from '@supabase/supabase-js';
+  import { env } from '$env/dynamic/public';
   import { onMount } from 'svelte';
 
   type Message = {
@@ -27,12 +29,54 @@
   let isTranslating = $state(false);
   let submitError = $state<string | null>(null);
 
+  const useSupabase = $derived(
+    Boolean(
+      (env.PUBLIC_SUPABASE_URL?.length ?? 0) > 0 && (env.PUBLIC_SUPABASE_ANON_KEY?.length ?? 0) > 0
+    )
+  );
+
   $effect(() => {
     if (typeof window === 'undefined') return;
     if (displayName) localStorage.setItem('corpspeak_displayName', displayName);
   });
 
   onMount(() => {
+    const supaUrl = env.PUBLIC_SUPABASE_URL;
+    const supaAnon = env.PUBLIC_SUPABASE_ANON_KEY;
+    if (supaUrl && supaAnon) {
+      const supabase = createClient(supaUrl, supaAnon, {
+        auth: { autoRefreshToken: true, persistSession: false, detectSessionInUrl: false }
+      });
+      const channel = supabase
+        .channel('corpspeak-room-general')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: 'room_id=eq.general'
+          },
+          (payload) => {
+            const row = payload.new as Record<string, unknown>;
+            const id = typeof row.id === 'string' ? row.id : String(row.id ?? '');
+            if (!id || messages.find((m) => m.id === id)) return;
+            const next: Message = {
+              id,
+              author_name: String(row.author_name ?? ''),
+              body: String(row.body ?? ''),
+              created_at: String(row.created_at ?? new Date().toISOString())
+            };
+            messages = [...messages, next];
+          }
+        )
+        .subscribe();
+
+      return () => {
+        void supabase.removeChannel(channel);
+      };
+    }
+
     const protocol = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = typeof location !== 'undefined' ? location.host : '';
     const ws = new WebSocket(`${protocol}//${host}/ws`);
@@ -103,7 +147,14 @@
   </div>
 
   <div class="messages-wrap">
-    <p class="muted">Messages appear here as they're sent (since you joined). No history is stored.</p>
+    <p class="muted">
+      Messages appear in real time.
+      {#if useSupabase}
+        With Supabase, translated text is stored in Postgres; anyone with the anon key can read it (see README).
+      {:else}
+        Nothing is stored—only the in-process broadcast to clients connected now (see README for Supabase mode).
+      {/if}
+    </p>
     <ul class="message-list">
       {#each messages as msg}
         <li class="message">

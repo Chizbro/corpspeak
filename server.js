@@ -3,8 +3,12 @@ import { WebSocketServer } from 'ws';
 import { handler } from './build/handler.js';
 import { addClient, removeClient, broadcast } from './src/lib/ws-clients.js';
 
-// So the API route (running inside the handler) can broadcast
-globalThis.__corpspeak_broadcast = broadcast;
+const useSupabase = Boolean(
+  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// So the API route (running inside the handler) can broadcast (legacy only)
+globalThis.__corpspeak_broadcast = useSupabase ? () => {} : broadcast;
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -19,23 +23,34 @@ const requestListener = (req, res) => {
 };
 
 const server = http.createServer(requestListener);
-const wss = new WebSocketServer({ noServer: true });
 
-server.on('upgrade', (request, socket, head) => {
-  const path = request.url?.split('?')[0];
-  if (path === '/ws') {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
-    });
-  } else {
+if (!useSupabase) {
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    const path = request.url?.split('?')[0];
+    if (path === '/ws') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
+
+  wss.on('connection', (ws) => {
+    addClient(ws);
+    ws.on('close', () => removeClient(ws));
+  });
+} else {
+  server.on('upgrade', (request, socket) => {
+    const path = request.url?.split('?')[0];
+    if (path === '/ws') {
+      socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+    }
     socket.destroy();
-  }
-});
-
-wss.on('connection', (ws) => {
-  addClient(ws);
-  ws.on('close', () => removeClient(ws));
-});
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`Listening on http://localhost:${PORT}`);

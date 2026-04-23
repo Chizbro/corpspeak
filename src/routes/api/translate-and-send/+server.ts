@@ -1,4 +1,5 @@
 import { env as privateEnv } from '$env/dynamic/private';
+import { getSupabaseAdmin, type InsertedMessageRow } from '$lib/server/supabaseAdmin';
 import type { RequestHandler } from './$types';
 
 const SYSTEM_PROMPT = `You are a translator. Given a user message, rewrite it in mindless corporate jargon: buzzwords, passive voice, and business-speak. Respond with only the translated text, no explanation.`;
@@ -108,6 +109,42 @@ export const POST: RequestHandler = async (event) => {
       };
       const translated =
         data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? rawBody;
+
+      const supabase = getSupabaseAdmin();
+      if (supabase) {
+        const { data: row, error: insertError } = await supabase
+          .from('messages')
+          .insert({
+            room_id: 'general',
+            author_name: authorName,
+            body: translated
+          })
+          .select('id, room_id, author_name, body, created_at')
+          .single<InsertedMessageRow>();
+
+        if (insertError) {
+          return new Response(
+            JSON.stringify({ error: `Supabase: ${insertError.message}` }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (!row) {
+          return new Response(
+            JSON.stringify({ error: 'Supabase: insert returned no row' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        const payload = {
+          id: row.id,
+          author_name: row.author_name,
+          body: row.body,
+          created_at: row.created_at
+        };
+        return new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
 
       const payload = {
         id: crypto.randomUUID(),
