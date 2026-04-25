@@ -29,10 +29,6 @@ function parseRetryDelaySeconds(errBody: string): number {
   return 60;
 }
 
-declare global {
-  var __corpspeak_broadcast: ((data: object) => void) | undefined;
-}
-
 export const POST: RequestHandler = async (event) => {
   const platform = event.platform as { env?: Record<string, string> } | undefined;
   const envVars = (platform?.env ?? privateEnv) as Record<string, string | undefined>;
@@ -111,53 +107,44 @@ export const POST: RequestHandler = async (event) => {
         data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? rawBody;
 
       const supabase = getSupabaseAdmin();
-      if (supabase) {
-        const { data: row, error: insertError } = await supabase
-          .from('messages')
-          .insert({
-            room_id: 'general',
-            author_name: authorName,
-            body: translated
-          })
-          .select('id, room_id, author_name, body, created_at')
-          .single<InsertedMessageRow>();
-
-        if (insertError) {
-          return new Response(
-            JSON.stringify({ error: `Supabase: ${insertError.message}` }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-          );
-        }
-        if (!row) {
-          return new Response(
-            JSON.stringify({ error: 'Supabase: insert returned no row' }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-          );
-        }
-        const payload = {
-          id: row.id,
-          author_name: row.author_name,
-          body: row.body,
-          created_at: row.created_at
-        };
-        return new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      if (!supabase) {
+        return new Response(
+          JSON.stringify({
+            error:
+              'Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (see README).'
+          }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        );
       }
 
+      const { data: row, error: insertError } = await supabase
+        .from('messages')
+        .insert({
+          room_id: 'general',
+          author_name: authorName,
+          body: translated
+        })
+        .select('id, room_id, author_name, body, created_at')
+        .single<InsertedMessageRow>();
+
+      if (insertError) {
+        return new Response(
+          JSON.stringify({ error: `Supabase: ${insertError.message}` }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (!row) {
+        return new Response(
+          JSON.stringify({ error: 'Supabase: insert returned no row' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
       const payload = {
-        id: crypto.randomUUID(),
-        author_name: authorName,
-        body: translated,
-        created_at: new Date().toISOString()
+        id: row.id,
+        author_name: row.author_name,
+        body: row.body,
+        created_at: row.created_at
       };
-
-      const broadcast = globalThis.__corpspeak_broadcast;
-      if (broadcast) {
-        broadcast(payload);
-      }
-
       return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }

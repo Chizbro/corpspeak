@@ -1,65 +1,65 @@
 # CorpSpeak
 
-Chatroom: every message is translated into corporate jargon. **By default (legacy):** no database—an in-process WebSocket broadcasts to clients that are online. **With Supabase (migration [Option B](docs/SUPABASE_MIGRATION_OPTION_B.md)):** translated text is **stored in Postgres** and **delivered with Supabase Realtime** (no app-managed `/ws` in production).
+Chatroom: every message is translated into corporate jargon. Translated text is **stored in Supabase Postgres** and **delivered to browsers with Supabase Realtime** (`postgres_changes` on `public.messages`). The UI is a **SvelteKit** app; **API routes** (Gemini translate + insert) run as **Netlify Functions**.
 
 ## Stack
 
 - **UI:** SvelteKit + Svelte 5 (runes only)
-- **Host:** Node (adapter-node); deploy on **Render** or any Node host
-- **Real-time (choose one):**
-  - **Legacy:** In-process WebSocket on `/ws`
-  - **Supabase:** `INSERT` on `public.messages` + `postgres_changes` (see [docs](docs/SUPABASE_MIGRATION_OPTION_B.md))
-- **LLM:** Google Gemini (via SvelteKit API route)
+- **Host:** [Netlify](https://www.netlify.com/) — static assets + SvelteKit serverless functions (`@sveltejs/adapter-netlify`)
+- **Data & realtime:** Supabase (Postgres + Realtime)
+- **LLM:** Google Gemini (SvelteKit API route `src/routes/api/translate-and-send/+server.ts`)
 
 ## Setup
 
-1. **Env**
+1. **Copy env**
 
-   Copy `.env.example` to `.env` and set at least `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey).
+   Copy `.env.example` to `.env`.
 
-2. **Supabase (optional but recommended for hosted multi-user)**
+2. **Supabase**
 
-   1. Create a project at [supabase.com](https://supabase.com) and run the SQL in `supabase/migrations/` (SQL editor: paste and run, or `supabase db push` with the CLI).
-   2. Set **server** env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-   3. Set **public** (browser) env: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` — SvelteKit exposes `PUBLIC_*` to the client; rebuild after changing them.
+   1. Create a project at [supabase.com](https://supabase.com) and run the SQL in `supabase/migrations/` (SQL editor, or `supabase db push` with the CLI).
+   2. **Server-only** (Netlify “environment variables” / local `.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`
+   3. **Public** (baked in at build time): `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` — SvelteKit exposes `PUBLIC_*` to the client. Rebuild after changing them.
 
 3. **Run locally**
 
-   **Production-style (Node; legacy uses WebSocket on `/ws`):**
-
    ```bash
    npm install
-   npm run build
-   npm start
+   npm run dev
    ```
 
-   **Vite dev server** (`npm run dev`):
+   With all variables set, `npm run dev` uses the same Realtime + API flow as production.
 
-   - **Legacy (no Supabase):** the API still returns *your* translated message, but other tabs do not get a live feed (Vite does not run `server.js` WebSockets).
-   - **With Supabase env:** Realtime works in dev—multi-tab without `npm start`.
+4. **Production build (local check)**
 
-## Deploy on Render
+   ```bash
+   npm run build
+   npm run preview
+   ```
 
-1. Create a **Web Service** and connect your repo.
-2. **Build command:** `npm run build`
-3. **Start command:** `npm start`
-4. **Environment:** `GEMINI_API_KEY` and, for Supabase mode, the five variables listed in `.env.example`.
-5. Render sets `PORT`; the app uses it automatically.
+   For a Netlify-like dev server (functions + static), use the [Netlify CLI](https://docs.netlify.com/cli/get-started/): `netlify dev`.
 
-See [DEPLOY.md](DEPLOY.md) for more detail (WebSocket vs Supabase).
+## Deploy on Netlify
+
+1. Connect the Git repo in the Netlify UI (or use the CLI).
+2. **Build command:** `npm run build`  
+   **Publish directory:** `build` (must match [netlify.toml](netlify.toml) — the SvelteKit Netlify adapter writes here).
+3. **Environment:** set `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, and `PUBLIC_SUPABASE_ANON_KEY`. The `PUBLIC_*` values must be present **before** the build so the client bundle can subscribe to Realtime.
+
+See [DEPLOY.md](DEPLOY.md) and [docs/SUPABASE.md](docs/SUPABASE.md) for details.
 
 ## Scripts
 
-- `npm run dev` — SvelteKit dev (WebSocket only if you add a custom Vite plugin; use Supabase Realtime for live updates in dev)
-- `npm run build` — Production build
-- `npm start` — Node: SvelteKit + WebSocket in **legacy** mode; in **Supabase** mode, `/ws` is disabled (Realtime only)
+- `npm run dev` — Vite + SvelteKit dev
+- `npm run build` — Production build (Netlify adapter)
+- `npm run preview` — Local preview of the production build
+- `npm run check` — `svelte-check`
 
 ## Project layout
 
-- `server.js` — Custom Node server: SvelteKit handler, optional WebSocket on `/ws` (legacy)
-- `src/lib/ws-clients.js` — Shared WebSocket client set and broadcast (legacy)
-- `src/lib/server/supabaseAdmin.ts` — Service-role Supabase client (API only)
-- `src/routes/+page.svelte` — Room UI; Supabase Realtime or WebSocket
-- `src/routes/api/translate-and-send/+server.ts` — Rate limit, Gemini, insert or broadcast
-- `docs/SUPABASE_MIGRATION_OPTION_B.md` — Full migration design (Option B)
-- `supabase/migrations/` — Postgres + Realtime setup SQL
+- `netlify.toml` — Netlify build config
+- `src/lib/server/supabaseAdmin.ts` — Service-role Supabase client (server-only, API route)
+- `src/routes/+page.svelte` — Room UI; subscribes to Realtime
+- `src/routes/api/translate-and-send/+server.ts` — Rate limit, Gemini, insert into `messages`
+- `docs/SUPABASE.md` — Schema, env, and deployment notes
+- `supabase/migrations/` — Postgres + Realtime publication SQL

@@ -1,46 +1,37 @@
-# Deploying to Render
+# Deploying to Netlify
 
-CorpSpeak runs as a **Node server** (SvelteKit adapter-node). In **legacy** mode it also runs a **WebSocket** on `/ws`. In **Supabase** mode (set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`), the app **does not** use `/ws`—the browser subscribes to **Supabase Realtime** instead. Render’s free tier can run it.
+CorpSpeak is a **SvelteKit** app built with [`@sveltejs/adapter-netlify`](https://svelte.dev/docs/kit/adapter-netlify). Netlify serves the **static front end** and runs **SvelteKit API routes** as **Netlify Functions**. **Realtime** is **not** provided by the host: the browser uses **Supabase Realtime** (WebSocket to Supabase), while translated messages are written with the **service role** from the `translate-and-send` API route.
 
-## 1. Create a Web Service on Render
+## 1. Create a site on Netlify
 
-1. Go to [dashboard.render.com](https://dashboard.render.com) and sign in.
-2. **New +** → **Web Service**.
-3. Connect your Git repository (GitHub/GitLab) and select the corpspeak repo.
-4. Configure:
-   - **Name:** corpspeak (or any name).
-   - **Region:** choose one.
-   - **Branch:** main (or your default).
-   - **Runtime:** Node.
+1. Open the [Netlify dashboard](https://app.netlify.com/) and sign in.
+2. **Add new site** → **Import an existing project** and connect the Git repository.
+3. Netlify can read [netlify.toml](netlify.toml). Confirm:
    - **Build command:** `npm run build`
-   - **Start command:** `npm start`
-   - **Instance type:** Free (if available).
+   - **Publish directory:** `build`
+4. **Environment variables** (site settings → **Environment variables**), at minimum:
+   - **`GEMINI_API_KEY`** — from [Google AI Studio](https://aistudio.google.com/apikey)
+   - **`SUPABASE_URL`**
+   - **`SUPABASE_SERVICE_ROLE_KEY`**
+   - **`PUBLIC_SUPABASE_URL`** (same project URL; safe to embed in the client bundle)
+   - **`PUBLIC_SUPABASE_ANON_KEY`**
 
-## 2. Environment variables
+`PUBLIC_*` must be set **before** `npm run build` so Vite inlines them for the browser. After changing any `PUBLIC_` or build-related var, trigger a new deploy.
 
-In the Render service → **Environment**, set at least:
+## 2. Supabase project
 
-- **`GEMINI_API_KEY`:** your Google AI Studio API key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)).
+1. Create a project at [supabase.com](https://supabase.com).
+2. Run the SQL in `supabase/migrations/` (or use the Supabase CLI).
+3. In the Supabase dashboard, ensure **Realtime** is enabled and `public.messages` is part of the Realtime publication (as in the migration).
 
-**If you use Supabase** (see [docs/SUPABASE_MIGRATION_OPTION_B.md](docs/SUPABASE_MIGRATION_OPTION_B.md)) add:
+Details: [docs/SUPABASE.md](docs/SUPABASE.md).
 
-- **`SUPABASE_URL`**
-- **`SUPABASE_SERVICE_ROLE_KEY`**
-- **`PUBLIC_SUPABASE_URL`** (same project URL, safe to expose in the client bundle)
-- **`PUBLIC_SUPABASE_ANON_KEY`**
+## 3. First deploy
 
-The `PUBLIC_*` values must be present **before** `npm run build` so the client can subscribe to Realtime.
-
-Save. Render will redeploy when you add or change env vars (or trigger a deploy).
-
-## 3. Deploy
-
-Click **Create Web Service** (or **Manual Deploy** if the service already exists). Render will run `npm run build` then `npm start`. The app listens on the port Render sets via `PORT`.
-
-Your app will be at `https://<service-name>.onrender.com`. WebSocket connections use the same host at path `/ws` (wss when the site is HTTPS).
+Save environment variables, then **Deploy site**. Netlify runs `npm run build` and publishes the `build` output. The live URL is shown in the site overview.
 
 ## 4. Notes
 
-- **Free tier:** The service may spin down after inactivity; the first request after that can be slow (cold start).
-- **WebSocket (legacy only):** Render supports WebSockets; the client uses `wss://<host>/ws` when the page is HTTPS. Skip this when using **Supabase Realtime**.
-- No Cloudflare or Netlify serverless; this is a single long-lived Node process.
+- **Node version:** [netlify.toml](netlify.toml) sets `NODE_VERSION` for the build; adjust if your stack requires a different LTS.
+- **Cold starts:** free-tier functions may cold-start; the first request after idle can be slower.
+- **Rate limiting** in the API route uses in-memory state per function instance; under load, limits are best-effort (same as any stateless host).
