@@ -1,10 +1,10 @@
 -- Retention: keep the N newest messages (global cap across all rooms).
 
-create or replace function public.prune_messages_to_limit(p_keep integer default 100)
+create or replace function corpspeak.prune_messages_to_limit(p_keep integer default 100)
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = corpspeak, pg_temp
 as $$
 declare
   deleted_count integer;
@@ -15,11 +15,11 @@ begin
 
   with keepers as (
     select id
-    from public.messages
+    from corpspeak.messages
     order by created_at desc, id desc
     limit p_keep
   )
-  delete from public.messages m
+  delete from corpspeak.messages m
   where not exists (select 1 from keepers k where k.id = m.id);
 
   get diagnostics deleted_count = row_count;
@@ -27,8 +27,10 @@ begin
 end;
 $$;
 
-comment on function public.prune_messages_to_limit(integer) is
+comment on function corpspeak.prune_messages_to_limit(integer) is
   'Deletes older rows so at most p_keep messages remain (newest by created_at). Call via service_role (e.g. Netlify scheduled function).';
 
-revoke all on function public.prune_messages_to_limit(integer) from public;
-grant execute on function public.prune_messages_to_limit(integer) to service_role;
+alter function corpspeak.prune_messages_to_limit(integer) owner to postgres;
+
+revoke all on function corpspeak.prune_messages_to_limit(integer) from public;
+grant execute on function corpspeak.prune_messages_to_limit(integer) to service_role;

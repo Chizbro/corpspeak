@@ -13,6 +13,7 @@ export default async function handler(_req) {
 
   const keep = Number(process.env.MESSAGE_RETENTION_KEEP ?? DEFAULT_KEEP);
   const supabase = createClient(url, key, {
+    db: { schema: 'corpspeak' },
     auth: { autoRefreshToken: false, persistSession: false }
   });
 

@@ -15,6 +15,7 @@ if (!url || !key) {
 }
 
 const supabase = createClient(url, key, {
+  db: { schema: 'corpspeak' },
   auth: { autoRefreshToken: false, persistSession: false }
 });
 

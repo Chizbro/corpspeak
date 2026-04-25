@@ -4,7 +4,7 @@ The app is deployed on **Netlify** (SvelteKit static + functions). **Supabase** 
 
 ## Goals
 
-1. **Persist** each translated message as a row in `public.messages` and deliver new rows to subscribers via **`postgres_changes`**.
+1. **Persist** each translated message as a row in the **`corpspeak`** schema (`corpspeak.messages`) and deliver new rows to subscribers via **`postgres_changes`**.
 2. **Keep** the product rule: the client sends raw text → the API calls Gemini → **only the translated (corp-speak) text** is stored and shown.
 3. **Separate secrets:** `SUPABASE_SERVICE_ROLE_KEY` is server-only; the browser uses `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_ANON_KEY` for **subscribe** (and future auth).
 
@@ -37,25 +37,33 @@ flowchart LR
 
 | Stage | Scope | Outcome |
 |-------|--------|---------|
-| **1** (done) | Schema + RLS + Realtime publication; env; API inserts; page subscribes to `INSERT` on `public.messages` | End-to-end with a dev Supabase project |
+| **1** (done) | Schema `corpspeak` + RLS + Realtime publication; env; API inserts; page subscribes to `INSERT` on `corpspeak.messages` | End-to-end with a dev Supabase project |
 | **2** | Stricter RLS, RPC-only insert if you want to avoid service role in the function | Hardening for a public app |
 | **3** (done) | Retention: cap total rows at 100 (newest by `created_at`) via `prune_messages_to_limit` RPC; Netlify `prune-messages-scheduled` hourly | Ops matches product copy |
 | **4+** | Supabase Auth, multi-room routes, move Gemini to an Edge Function | [PLAN.md](../PLAN.md) backlog |
 
 ## Data model
 
-- `public.messages`: `id` (UUID), `room_id` (text, default `general`), `author_name`, `body` (translated), `created_at` (timestamptz).
+- **`corpspeak.messages`:** `id` (UUID), `room_id` (text, default `general`), `author_name`, `body` (translated), `created_at` (timestamptz).
 - **RLS:** allow **anonymous `SELECT`** for Realtime delivery with the anon key; **no** `INSERT` for `anon` (inserts go through the API with the service role).
+
+## Schema isolation (shared Supabase / shared Postgres)
+
+All Corpspeak tables, policies, the retention RPC, and the Realtime publication target live in the **`corpspeak`** schema so they do not mix with `public` or other app schemas. The Svelte app and server code pass `db: { schema: 'corpspeak' }` to the Supabase client, and PostgREST is configured to include that schema.
+
+**Hosted Supabase (dashboard):** open **Settings → Data API** (or **API** → *Exposed schemas*), and add **`corpspeak`** to the list of API-exposed schemas (alongside `public` and any others you need). Without this, REST/RPC/Realtime for `corpspeak` will 404. Local development already sets this in `supabase/config.toml`.
+
+Other services on the same database are unaffected as long as they keep their data in their own schemas; the Corpspeak app only queries `corpspeak.*`. The same project `anon` key can still call PostgREST for other exposed schemas, but RLS and schema separation keep Corpspeak’s rows scoped to the Corpspeak app configuration.
 
 ## Retention
 
-- SQL function `public.prune_messages_to_limit(p_keep integer default 100)` deletes older rows so at most `p_keep` messages remain globally (ordered by `created_at desc`, then `id desc`). Only `service_role` may execute it.
+- SQL function `corpspeak.prune_messages_to_limit(p_keep integer default 100)` deletes older rows so at most `p_keep` messages remain globally (ordered by `created_at desc`, then `id desc`). Only `service_role` may execute it.
 - **Production:** Netlify scheduled function `netlify/functions/prune-messages-scheduled.mjs` runs hourly on **production deploys** (see [netlify.toml](../netlify.toml); Netlify does not run schedules on deploy previews). Set optional `MESSAGE_RETENTION_KEEP` in Netlify env to override the default cap.
-- **Manual / local:** after applying migrations, `npm run prune` (uses `SUPABASE_*` from `.env`) or run `select public.prune_messages_to_limit(100);` in the SQL editor.
+- **Manual / local:** after applying migrations, `npm run prune` (uses `SUPABASE_*` from `.env`) or run `select corpspeak.prune_messages_to_limit(100);` in the SQL editor.
 
 ## Deployment checklist
 
-1. Create a Supabase project; run the SQL in `supabase/migrations/`.
+1. Create or reuse a Supabase project; run the SQL in `supabase/migrations/`. If you reuse a project, expose the **`corpspeak`** schema in the Data API (see *Schema isolation* above).
 2. In **Netlify** (site → Environment variables), set: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`. The `PUBLIC_*` variables must be present **at build time** so the client can subscribe to Realtime.
 3. Redeploy after changing `PUBLIC_*` or Supabase keys.
 
