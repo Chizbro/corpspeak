@@ -7,7 +7,7 @@ CorpSpeak is a **SvelteKit** app built with [`@sveltejs/adapter-netlify`](https:
 1. Open the [Netlify dashboard](https://app.netlify.com/) and sign in.
 2. **Add new site** → **Import an existing project** and connect the Git repository.
 3. Netlify can read [netlify.toml](netlify.toml). Confirm:
-   - **Build command:** `npm run build`
+   - **Build command:** `bash scripts/netlify-build.sh` (or leave blank so Netlify uses the file)
    - **Publish directory:** `build`
 4. **Environment variables** (site settings → **Environment variables**), at minimum:
    - **`GEMINI_API_KEY`** — from [Google AI Studio](https://aistudio.google.com/apikey)
@@ -15,21 +15,27 @@ CorpSpeak is a **SvelteKit** app built with [`@sveltejs/adapter-netlify`](https:
    - **`SUPABASE_SERVICE_ROLE_KEY`**
    - **`PUBLIC_SUPABASE_URL`** (same project URL; safe to embed in the client bundle)
    - **`PUBLIC_SUPABASE_ANON_KEY`**
+   - **Production / `CONTEXT=production` (required for [Supabase CLI](https://supabase.com/docs/reference/cli) `db push` on each deploy):**
+     - **`SUPABASE_ACCESS_TOKEN`** — [account access token](https://supabase.com/dashboard/account/tokens) (used by `supabase link` non-interactively)
+     - **`SUPABASE_PROJECT_REF`** — project ref (Project Settings → General → Reference ID)
+     - **`SUPABASE_DB_PASSWORD`** — Postgres password (Settings → Database; same secret the CLI needs to connect for `supabase db push`)
    - **`MESSAGE_RETENTION_KEEP`** (optional) — max messages to keep after hourly prune; default `100`
+
+**Deploy contexts:** the build script runs `supabase link` and `supabase db push` on **production** only. [Deploy previews](https://docs.netlify.com/build/configure-builds/overview/#build-contexts) skip pushing migrations so a PR does not apply SQL to the live database. To run `db push` on a non-production build (e.g. a dedicated test project), set **`SUPABASE_DB_PUSH=1`** and the three Supabase CLI variables. To turn off automatic migrations (manage schema only in the dashboard or elsewhere), set **`SUPABASE_SKIP_DB_PUSH=1`**.
 
 `PUBLIC_*` must be set **before** `npm run build` so Vite inlines them for the browser. After changing any `PUBLIC_` or build-related var, trigger a new deploy.
 
 ## 2. Supabase project
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Run the SQL in `supabase/migrations/` (or use the Supabase CLI).
+2. **Migrations** are applied on each **production** Netlify deploy via `supabase link` and `supabase db push` (see [scripts/netlify-build.sh](../scripts/netlify-build.sh)). You can still run the SQL manually or with the CLI for the first-time setup.
 3. In the Supabase dashboard, add the **`corpspeak`** schema to the Data API’s exposed schemas, ensure **Realtime** is enabled, and confirm `corpspeak.messages` is part of the Realtime publication (as in the migration).
 
 Details: [docs/SUPABASE.md](docs/SUPABASE.md).
 
 ## 3. First deploy
 
-Save environment variables, then **Deploy site**. Netlify runs `npm run build` and publishes the `build` output. The live URL is shown in the site overview.
+Save environment variables, then **Deploy site**. Netlify runs `scripts/netlify-build.sh` (migrations, then `npm run build`) and publishes the `build` output. The live URL is shown in the site overview.
 
 ## 4. Notes
 
