@@ -53,9 +53,9 @@ Chatroom: every message is translated into corporate jargon. Translated text is 
 ## Deploy on Netlify
 
 1. Connect the Git repo in the Netlify UI (or use the CLI).
-2. **Build command:** `npm run build`  
+2. **Build command:** from [netlify.toml](netlify.toml) — `bash scripts/netlify-build.sh` (runs `supabase link` + `supabase db push` on production, then `npm run build`)  
    **Publish directory:** `build` (must match [netlify.toml](netlify.toml) — the SvelteKit Netlify adapter writes here).
-3. **Environment:** set `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, and `PUBLIC_SUPABASE_ANON_KEY`. The `PUBLIC_*` values must be present **before** the build so the client bundle can subscribe to Realtime.
+3. **Environment:** set `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, and `PUBLIC_SUPABASE_ANON_KEY`, plus the Supabase CLI variables for production migrations (see [DEPLOY.md](DEPLOY.md)). The `PUBLIC_*` values must be present **before** the build so the client bundle can subscribe to Realtime.
 
 See [DEPLOY.md](DEPLOY.md) and [docs/SUPABASE.md](docs/SUPABASE.md) for details.
 
@@ -65,13 +65,14 @@ See [DEPLOY.md](DEPLOY.md) and [docs/SUPABASE.md](docs/SUPABASE.md) for details.
 - `npm run stack` — Local Supabase (`supabase start`) + `netlify dev` (E2E with functions)
 - `npm run stack:down` — `supabase stop`
 - `npm run prune` — Run message retention RPC once (needs `SUPABASE_*` in `.env`)
-- `npm run build` — Production build (Netlify adapter)
+- `npm run build` — Production build (Netlify adapter); Netlify uses `scripts/netlify-build.sh` so migrations run first
 - `npm run preview` — Local preview of the production build
 - `npm run check` — `svelte-check`
 
 ## Project layout
 
 - `netlify.toml` — Netlify build config
+- `scripts/netlify-build.sh` — Production: Supabase `db push`, then SvelteKit build
 - `src/lib/server/supabaseAdmin.ts` — Service-role Supabase client (server-only, API route)
 - `src/routes/+page.svelte` — Room UI; subscribes to Realtime
 - `src/routes/api/translate-and-send/+server.ts` — Rate limit, Gemini, insert into `messages`
