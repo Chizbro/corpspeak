@@ -1,10 +1,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
+import { supabaseDbOptions } from '$lib/corpspeakSchema';
 
-let cached: SupabaseClient | null | undefined;
+type AdminClient = SupabaseClient<any, 'corpspeak'>;
+let cached: AdminClient | null | undefined;
 
 /** Service-role client for API routes. Returns null if Supabase is not configured. */
-export function getSupabaseAdmin(): SupabaseClient | null {
+export function getSupabaseAdmin(): AdminClient | null {
   if (cached !== undefined) return cached;
   const url = env.SUPABASE_URL;
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -13,6 +15,7 @@ export function getSupabaseAdmin(): SupabaseClient | null {
     return null;
   }
   cached = createClient(url, key, {
+    db: supabaseDbOptions,
     auth: { autoRefreshToken: false, persistSession: false }
   });
   return cached;

@@ -23,7 +23,7 @@ CorpSpeak is a **SvelteKit** app built with [`@sveltejs/adapter-netlify`](https:
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Run the SQL in `supabase/migrations/` (or use the Supabase CLI).
-3. In the Supabase dashboard, ensure **Realtime** is enabled and `public.messages` is part of the Realtime publication (as in the migration).
+3. In the Supabase dashboard, add the **`corpspeak`** schema to the Data API’s exposed schemas, ensure **Realtime** is enabled, and confirm `corpspeak.messages` is part of the Realtime publication (as in the migration).
 
 Details: [docs/SUPABASE.md](docs/SUPABASE.md).
 

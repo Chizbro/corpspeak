@@ -1,6 +1,6 @@
 # CorpSpeak
 
-Chatroom: every message is translated into corporate jargon. Translated text is **stored in Supabase Postgres** and **delivered to browsers with Supabase Realtime** (`postgres_changes` on `public.messages`). The UI is a **SvelteKit** app; **API routes** (Gemini translate + insert) run as **Netlify Functions**.
+Chatroom: every message is translated into corporate jargon. Translated text is **stored in Supabase Postgres** and **delivered to browsers with Supabase Realtime** (`postgres_changes` on `corpspeak.messages`). The UI is a **SvelteKit** app; **API routes** (Gemini translate + insert) run as **Netlify Functions**.
 
 ## Stack
 

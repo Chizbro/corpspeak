@@ -37,6 +37,6 @@ flowchart LR
 
 ## Operator checklist
 
-1. Supabase: run migrations; confirm Realtime on `public.messages`.
+1. Supabase: run migrations; confirm Realtime on `corpspeak.messages` and that the `corpspeak` schema is API-exposed.
 2. Netlify: set all env vars; deploy so `npm run build` runs with `PUBLIC_*` defined.
 3. Optional hardening: tighten RLS, retention jobs, and auth (tracked in [PLAN.md](PLAN.md) as follow-ups).

@@ -2,6 +2,7 @@
   import { createClient } from '@supabase/supabase-js';
   import { env } from '$env/dynamic/public';
   import { onMount } from 'svelte';
+  import { supabaseDbOptions } from '$lib/corpspeakSchema';
 
   type Message = {
     id: string;
@@ -46,6 +47,7 @@
     if (!supaUrl || !supaAnon) return;
 
     const supabase = createClient(supaUrl, supaAnon, {
+      db: supabaseDbOptions,
       auth: { autoRefreshToken: true, persistSession: false, detectSessionInUrl: false }
     });
     const channel = supabase
@@ -54,7 +56,7 @@
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'public',
+          schema: supabaseDbOptions.schema,
           table: 'messages',
           filter: 'room_id=eq.general'
         },
