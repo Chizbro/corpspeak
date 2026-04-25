@@ -15,6 +15,7 @@ CorpSpeak is a **SvelteKit** app built with [`@sveltejs/adapter-netlify`](https:
    - **`SUPABASE_SERVICE_ROLE_KEY`**
    - **`PUBLIC_SUPABASE_URL`** (same project URL; safe to embed in the client bundle)
    - **`PUBLIC_SUPABASE_ANON_KEY`**
+   - **`MESSAGE_RETENTION_KEEP`** (optional) — max messages to keep after hourly prune; default `100`
 
 `PUBLIC_*` must be set **before** `npm run build` so Vite inlines them for the browser. After changing any `PUBLIC_` or build-related var, trigger a new deploy.
 
@@ -32,6 +33,7 @@ Save environment variables, then **Deploy site**. Netlify runs `npm run build` a
 
 ## 4. Notes
 
+- **Message retention:** After you apply migrations, Netlify runs `prune-messages-scheduled` on **production** every hour (see [netlify.toml](netlify.toml)). It calls Supabase RPC `prune_messages_to_limit` so only the newest rows (default 100 total) remain.
 - **Node version:** [netlify.toml](netlify.toml) sets `NODE_VERSION` for the build; adjust if your stack requires a different LTS.
 - **Cold starts:** free-tier functions may cold-start; the first request after idle can be slower.
 - **Rate limiting** in the API route uses in-memory state per function instance; under load, limits are best-effort (same as any stateless host).
