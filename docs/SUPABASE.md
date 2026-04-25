@@ -39,13 +39,19 @@ flowchart LR
 |-------|--------|---------|
 | **1** (done) | Schema + RLS + Realtime publication; env; API inserts; page subscribes to `INSERT` on `public.messages` | End-to-end with a dev Supabase project |
 | **2** | Stricter RLS, RPC-only insert if you want to avoid service role in the function | Hardening for a public app |
-| **3** | Retention: delete rows older than N hours | Match ops to product copy |
+| **3** (done) | Retention: cap total rows at 100 (newest by `created_at`) via `prune_messages_to_limit` RPC; Netlify `prune-messages-scheduled` hourly | Ops matches product copy |
 | **4+** | Supabase Auth, multi-room routes, move Gemini to an Edge Function | [PLAN.md](../PLAN.md) backlog |
 
 ## Data model
 
 - `public.messages`: `id` (UUID), `room_id` (text, default `general`), `author_name`, `body` (translated), `created_at` (timestamptz).
 - **RLS:** allow **anonymous `SELECT`** for Realtime delivery with the anon key; **no** `INSERT` for `anon` (inserts go through the API with the service role).
+
+## Retention
+
+- SQL function `public.prune_messages_to_limit(p_keep integer default 100)` deletes older rows so at most `p_keep` messages remain globally (ordered by `created_at desc`, then `id desc`). Only `service_role` may execute it.
+- **Production:** Netlify scheduled function `netlify/functions/prune-messages-scheduled.mjs` runs hourly on **production deploys** (see [netlify.toml](../netlify.toml); Netlify does not run schedules on deploy previews). Set optional `MESSAGE_RETENTION_KEEP` in Netlify env to override the default cap.
+- **Manual / local:** after applying migrations, `npm run prune` (uses `SUPABASE_*` from `.env`) or run `select public.prune_messages_to_limit(100);` in the SQL editor.
 
 ## Deployment checklist
 

@@ -37,7 +37,7 @@
 
 - [ ] **Rooms:** route like `/room/[id]`, `room_id` on messages
 - [ ] **Auth:** Supabase Auth; map identities to `author_name` or user id
-- [ ] **Retention:** scheduled job to prune old messages
+- [x] **Retention:** scheduled job to prune old messages (keep 100 newest globally; Supabase RPC + Netlify hourly function)
 - [ ] **Prompts:** tunable system prompt and safety filters in the API route
 
 ---

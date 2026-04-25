@@ -4,3 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Hourly cap on stored messages (see supabase/migrations/*message_retention*.sql).
+[functions."prune-messages-scheduled"]
+  schedule = "@hourly"
