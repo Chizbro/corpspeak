@@ -1,4 +1,5 @@
 import { env as privateEnv } from '$env/dynamic/private';
+import { ensureCorpspeakSchemaIfDbUrlSet, supabaseDataApiHint } from '$lib/server/ensureCorpspeakSchema';
 import { getSupabaseAdmin, type InsertedMessageRow } from '$lib/server/supabaseAdmin';
 import type { RequestHandler } from './$types';
 
@@ -117,6 +118,18 @@ export const POST: RequestHandler = async (event) => {
         );
       }
 
+      try {
+        await ensureCorpspeakSchemaIfDbUrlSet();
+      } catch (bootErr) {
+        const msg = bootErr instanceof Error ? bootErr.message : String(bootErr);
+        return new Response(
+          JSON.stringify({
+            error: `Supabase database bootstrap failed: ${msg} Set SUPABASE_DB_URL to a direct Postgres connection string (see .env.example) or apply supabase/migrations/ manually.`
+          }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
       const { data: row, error: insertError } = await supabase
         .from('messages')
         .insert({
@@ -129,7 +142,9 @@ export const POST: RequestHandler = async (event) => {
 
       if (insertError) {
         return new Response(
-          JSON.stringify({ error: `Supabase: ${insertError.message}` }),
+          JSON.stringify({
+            error: `Supabase: ${insertError.message}${supabaseDataApiHint(insertError)}`
+          }),
           { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
       }
