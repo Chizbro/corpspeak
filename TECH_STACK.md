@@ -1,7 +1,8 @@
 # UI: SvelteKit and Svelte 5
-# HOST: Node (adapter-node); deploy on Render (or any Node host)
-# REAL-TIME: In-process WebSocket on /ws (server.js + src/lib/ws-clients.js); no Pusher/Ably
-# AGENT: Google Gemini 2.0 Flash via SvelteKit API route (src/routes/api/translate-and-send/+server.ts). Set GEMINI_API_KEY (get a key at https://aistudio.google.com/apikey)
+# HOST: Netlify (@sveltejs/adapter-netlify); see netlify.toml and DEPLOY.md
+# REAL-TIME: Supabase Realtime (postgres_changes on public.messages)
+# DATA: Supabase Postgres; server writes with service role in API route
+# LLM: Google Gemini 2.5 Flash via src/routes/api/translate-and-send (+server.ts). Set GEMINI_API_KEY (https://aistudio.google.com/apikey)
 
 DO NOT USE SVELTE 4
 YOU MUST USE RUNES SYNTAX

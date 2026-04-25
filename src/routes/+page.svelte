@@ -43,57 +43,38 @@
   onMount(() => {
     const supaUrl = env.PUBLIC_SUPABASE_URL;
     const supaAnon = env.PUBLIC_SUPABASE_ANON_KEY;
-    if (supaUrl && supaAnon) {
-      const supabase = createClient(supaUrl, supaAnon, {
-        auth: { autoRefreshToken: true, persistSession: false, detectSessionInUrl: false }
-      });
-      const channel = supabase
-        .channel('corpspeak-room-general')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: 'room_id=eq.general'
-          },
-          (payload) => {
-            const row = payload.new as Record<string, unknown>;
-            const id = typeof row.id === 'string' ? row.id : String(row.id ?? '');
-            if (!id || messages.find((m) => m.id === id)) return;
-            const next: Message = {
-              id,
-              author_name: String(row.author_name ?? ''),
-              body: String(row.body ?? ''),
-              created_at: String(row.created_at ?? new Date().toISOString())
-            };
-            messages = [...messages, next];
-          }
-        )
-        .subscribe();
+    if (!supaUrl || !supaAnon) return;
 
-      return () => {
-        void supabase.removeChannel(channel);
-      };
-    }
-
-    const protocol = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = typeof location !== 'undefined' ? location.host : '';
-    const ws = new WebSocket(`${protocol}//${host}/ws`);
-
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as Message;
-        if (payload?.id && !messages.find((m) => m.id === payload.id)) {
-          messages = [...messages, payload];
+    const supabase = createClient(supaUrl, supaAnon, {
+      auth: { autoRefreshToken: true, persistSession: false, detectSessionInUrl: false }
+    });
+    const channel = supabase
+      .channel('corpspeak-room-general')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: 'room_id=eq.general'
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const id = typeof row.id === 'string' ? row.id : String(row.id ?? '');
+          if (!id || messages.find((m) => m.id === id)) return;
+          const next: Message = {
+            id,
+            author_name: String(row.author_name ?? ''),
+            body: String(row.body ?? ''),
+            created_at: String(row.created_at ?? new Date().toISOString())
+          };
+          messages = [...messages, next];
         }
-      } catch {
-        // ignore
-      }
-    };
+      )
+      .subscribe();
 
     return () => {
-      ws.close();
+      void supabase.removeChannel(channel);
     };
   });
 
@@ -148,11 +129,13 @@
 
   <div class="messages-wrap">
     <p class="muted">
-      Messages appear in real time.
       {#if useSupabase}
-        With Supabase, translated text is stored in Postgres; anyone with the anon key can read it (see README).
+        Messages use Supabase Realtime: translated text is stored in Postgres (see repo <code>docs/SUPABASE.md</code> for
+        RLS).
       {:else}
-        Nothing is stored—only the in-process broadcast to clients connected now (see README for Supabase mode).
+        Set <code>PUBLIC_SUPABASE_URL</code> and <code>PUBLIC_SUPABASE_ANON_KEY</code> in
+        <code>.env</code> (or Netlify) so the app can load history and receive new messages. Server-side
+        <code>SUPABASE_*</code> and <code>GEMINI_API_KEY</code> are also required to send.
       {/if}
     </p>
     <ul class="message-list">
