@@ -63,8 +63,8 @@ Other services on the same database are unaffected as long as they keep their da
 
 ## Deployment checklist
 
-1. Create or reuse a Supabase project; run the SQL in `supabase/migrations/`. If you reuse a project, expose the **`corpspeak`** schema in the Data API (see *Schema isolation* above).
-2. In **Netlify** (site → Environment variables), set: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`. The `PUBLIC_*` variables must be present **at build time** so the client can subscribe to Realtime.
+1. Create or reuse a Supabase project; run the SQL in `supabase/migrations/` (or rely on the Netlify build, which runs `supabase link` + `db push` before `npm run build` when [DEPLOY.md](../DEPLOY.md) lists `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are set). If you reuse a project, expose the **`corpspeak`** schema in the Data API (see *Schema isolation* above).
+2. In **Netlify** (site → Environment variables), set: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`, plus the build-time migration variables from [DEPLOY.md](../DEPLOY.md) (`SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, and `SUPABASE_DB_PASSWORD` if the CLI needs it). The `PUBLIC_*` variables must be present **at build time** so the client can subscribe to Realtime.
 3. Redeploy after changing `PUBLIC_*` or Supabase keys.
 
 ## Risks and mitigations

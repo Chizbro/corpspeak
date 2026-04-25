@@ -1,5 +1,6 @@
 [build]
-  command = "npm run build"
+  # Migrations first so production schema matches the code being deployed.
+  command = "bash scripts/push-migrations.sh && npm run build"
   publish = "build"
 
 [build.environment]

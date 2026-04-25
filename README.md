@@ -53,7 +53,7 @@ Chatroom: every message is translated into corporate jargon. Translated text is 
 ## Deploy on Netlify
 
 1. Connect the Git repo in the Netlify UI (or use the CLI).
-2. **Build command:** `npm run build`  
+2. **Build command:** `bash scripts/push-migrations.sh && npm run build` (Supabase migrations, then Vite; same as [netlify.toml](netlify.toml))  
    **Publish directory:** `build` (must match [netlify.toml](netlify.toml) — the SvelteKit Netlify adapter writes here).
 3. **Environment:** set `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_SUPABASE_URL`, and `PUBLIC_SUPABASE_ANON_KEY`. The `PUBLIC_*` values must be present **before** the build so the client bundle can subscribe to Realtime.
 

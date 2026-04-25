@@ -7,10 +7,13 @@ CorpSpeak is a **SvelteKit** app built with [`@sveltejs/adapter-netlify`](https:
 1. Open the [Netlify dashboard](https://app.netlify.com/) and sign in.
 2. **Add new site** → **Import an existing project** and connect the Git repository.
 3. Netlify can read [netlify.toml](netlify.toml). Confirm:
-   - **Build command:** `npm run build`
+   - **Build command:** `bash scripts/push-migrations.sh && npm run build` (migrations, then the Vite build — see [netlify.toml](netlify.toml))
    - **Publish directory:** `build`
 4. **Environment variables** (site settings → **Environment variables**), at minimum:
    - **`GEMINI_API_KEY`** — from [Google AI Studio](https://aistudio.google.com/apikey)
+   - **`SUPABASE_ACCESS_TOKEN`** — [personal access token](https://supabase.com/dashboard/account/tokens) for the Supabase CLI (build step applies `supabase/migrations/` before `npm run build`)
+   - **`SUPABASE_PROJECT_REF`** — project ref (Settings → General → Reference ID) so the build can `supabase link` + `db push`
+   - **`SUPABASE_DB_PASSWORD`** — database password (Settings → Database) if the CLI needs it to apply migrations; safe to scope to the **Build** context only
    - **`SUPABASE_URL`**
    - **`SUPABASE_SERVICE_ROLE_KEY`**
    - **`PUBLIC_SUPABASE_URL`** (same project URL; safe to embed in the client bundle)
