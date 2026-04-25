@@ -4,14 +4,17 @@
  */
 const clients = new Set();
 
+/** @param {import('ws').WebSocket} ws */
 export function addClient(ws) {
   clients.add(ws);
 }
 
+/** @param {import('ws').WebSocket} ws */
 export function removeClient(ws) {
   clients.delete(ws);
 }
 
+/** @param {object} data */
 export function broadcast(data) {
   const payload = JSON.stringify(data);
   for (const ws of clients) {

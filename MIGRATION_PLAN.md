@@ -64,3 +64,5 @@ flowchart LR
 - Add **Supabase** when you need **durable history, RLS, and built-in Realtime** without building DO logic yourself.
 
 This plan fits Corpspeak’s current “translate then broadcast” flow and scales to multi-room and persistence when you are ready.
+
+**Implementation for Option B (Supabase) in this repo:** see [docs/SUPABASE_MIGRATION_OPTION_B.md](docs/SUPABASE_MIGRATION_OPTION_B.md) and `supabase/migrations/`.
